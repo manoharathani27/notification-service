@@ -12,6 +12,9 @@ const logger = require('./config/logger');
 const { initSocketService } = require('./services/socketService');
 const { startWorker } = require('./workers/notificationWorker');
 
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpec = require("./config/swagger");
+
 // Routes
 const notificationRoutes = require('./routes/notificationRoutes');
 const templateRoutes = require('./routes/templateRoutes');
@@ -29,6 +32,9 @@ app.use(helmet());
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
+
+// Swagger Documentation
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
 app.use('/api/auth', authRoutes);
