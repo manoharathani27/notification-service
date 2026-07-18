@@ -56,16 +56,31 @@ const PORT = process.env.PORT || 3000;
 
 async function bootstrap() {
   try {
+    // Database is required
     await connectDB();
     await sequelize.sync({ alter: true });
-    await connectRedis();
-    initSocketService(io);
-    startWorker();
+
+    // Start the HTTP server immediately
     server.listen(PORT, () => {
       logger.info(`Notification Service running on port ${PORT}`);
     });
+
+    // Initialize Socket.IO
+    initSocketService(io);
+
+    // Connect Redis in the background
+    connectRedis()
+      .then(() => {
+        logger.info("Redis connected successfully");
+        startWorker();
+      })
+      .catch((err) => {
+        logger.error("Redis connection failed:", err.message);
+        logger.warn("Application is running without Redis. Worker not started.");
+      });
+
   } catch (err) {
-    logger.error('Failed to start server:', err);
+    logger.error("Failed to connect PostgreSQL:", err);
     process.exit(1);
   }
 }
