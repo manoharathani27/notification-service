@@ -1,36 +1,101 @@
 # Notification Service
 
-A production-grade multi-channel notification microservice built with Node.js, BullMQ, Redis, and PostgreSQL. Supports Email, SMS, and In-App (WebSocket) delivery with retry logic, template engine, user preferences, and rate limiting.
+A production-ready, cloud-deployed multi-channel notification microservice built with Node.js, Express.js, BullMQ, Redis, and PostgreSQL.
+
+The service provides asynchronous notification processing for Email, SMS, and In-App notifications with JWT authentication, retry mechanisms, rate limiting, user preferences, templates, and delivery tracking.
+
+The application is containerized using Docker and deployed on Google Cloud Platform (GCP).
+
+---
+
+## Live Deployment
+
+The backend service is deployed on Google Cloud Run.
+
+Health Check:
+
+`https://notification-service-710340448406.asia-south1.run.app/health`
+
+Expected response:
+
+```json
+{
+  "status": "ok",
+  "service": "notification-service"
+}
+```
 
 ---
 
 ## Architecture
 
+```text
+                     Client / Application
+                             |
+                             v
+                    REST API Request
+                             |
+                             v
+                  Google Cloud Run
+                (Node.js + Express.js)
+                             |
+                 JWT Authentication
+                             |
+              +--------------+--------------+
+              |                             |
+              v                             v
+       Cloud SQL                       BullMQ Queue
+      (PostgreSQL)                          |
+                                            v
+                                    Memorystore Redis
+                                            |
+                                            v
+                                   Notification Worker
+                                            |
+                          +-----------------+-----------------+
+                          |                 |                 |
+                          v                 v                 v
+                        Email              SMS             In-App
+                     Nodemailer          Twilio           Socket.io
+                          |
+                          v
+                       Gmail SMTP
+
+              Secrets -> GCP Secret Manager
+              Images  -> Artifact Registry
 ```
-Any Service  ──▶  POST /api/notifications/send
-                          │
-                    BullMQ Queue (Redis)
-                          │
-              ┌───────────┼───────────┐
-        Email Worker   SMS Worker  In-App Worker
-        (Nodemailer)   (Twilio)   (Socket.io)
-              └───────────┼───────────┘
-                    PostgreSQL
-                 (Delivery Logs)
-```
+
+---
+
+## GCP Deployment Architecture
+
+The production environment uses:
+
+- Cloud Run - Hosts the containerized Node.js application
+- Cloud SQL - Managed PostgreSQL database
+- Memorystore for Redis - Redis backend for BullMQ
+- Secret Manager - Secure storage for sensitive credentials
+- Artifact Registry - Stores Docker container images
+- VPC Networking - Allows Cloud Run to communicate with Redis using private networking
 
 ---
 
 ## Features
 
-- **Multi-channel delivery** — Email (Nodemailer), SMS (Twilio), In-App (WebSocket)
-- **Job Queue** — BullMQ with Redis for async processing and automatic retries
-- **Template Engine** — Handlebars-based reusable templates stored in PostgreSQL
-- **User Preferences** — Per-user opt-in/out per channel
-- **Rate Limiting** — Redis-based counter (e.g. max 5 emails/hour per user)
-- **Delivery Tracking** — Full lifecycle: `queued → sent → delivered → failed`
-- **JWT Auth** — Secure all endpoints
-- **Docker** — One command setup with Docker Compose
+- Multi-channel notifications: Email, SMS, and In-App
+- Asynchronous notification processing using BullMQ
+- Redis-backed job queues
+- Automatic retry mechanism for failed jobs
+- PostgreSQL-based notification persistence
+- JWT authentication
+- User notification preferences
+- Handlebars-based notification templates
+- Per-user rate limiting
+- Notification delivery tracking
+- WebSocket-based In-App notifications
+- Docker containerization
+- Cloud-native deployment on GCP
+- Secure credential management using Secret Manager
 
 ---
 
@@ -39,81 +104,166 @@ Any Service  ──▶  POST /api/notifications/send
 | Layer | Technology |
 |---|---|
 | Runtime | Node.js |
-| Framework | Express.js |
-| Queue | BullMQ + Redis |
-| Database | PostgreSQL + Sequelize |
-| Real-time | Socket.io |
+| Backend Framework | Express.js |
+| Database | PostgreSQL |
+| ORM | Sequelize |
+| Queue | BullMQ |
+| Cache / Queue Backend | Redis |
+| Authentication | JWT |
 | Email | Nodemailer |
 | SMS | Twilio |
+| Real-Time Communication | Socket.io |
 | Templates | Handlebars |
-| Auth | JWT |
 | Containerization | Docker |
+| Cloud Platform | Google Cloud Platform |
+| Compute | Cloud Run |
+| Managed Database | Cloud SQL |
+| Managed Redis | Memorystore for Redis |
+| Container Registry | Artifact Registry |
+| Secrets | Secret Manager |
+
+---
+
+## Notification Flow
+
+```text
+POST /api/notifications/send
+          |
+          v
+    JWT Authentication
+          |
+          v
+   Validate Request
+          |
+          v
+ Save Notification
+   in PostgreSQL
+          |
+          v
+ Add Job to BullMQ
+          |
+          v
+ Memorystore Redis
+          |
+          v
+ Notification Worker
+          |
+          v
+ Email / SMS / In-App
+          |
+          v
+ Update Delivery Status
+   in PostgreSQL
+```
+
+---
+
+## Email Notification Flow
+
+The Email notification workflow has been tested end-to-end in the deployed GCP environment.
+
+```text
+API Request
+    |
+    v
+Cloud Run
+    |
+    v
+BullMQ
+    |
+    v
+Memorystore Redis
+    |
+    v
+Notification Worker
+    |
+    v
+Nodemailer
+    |
+    v
+Gmail SMTP
+    |
+    v
+Email Delivered
+```
 
 ---
 
 ## Getting Started
 
 ### Prerequisites
-- Node.js v18+
+
+- Node.js 18+
 - PostgreSQL
 - Redis
-- (Optional) Twilio account for SMS
+- Docker (recommended)
+- Gmail App Password for email delivery
+- Twilio account (optional for SMS)
 
-### 1. Clone the repo
+### Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/notification-service.git
+git clone https://github.com/manoharathani27/notification-service.git
 cd notification-service
 ```
 
-### 2. Setup environment
-
-```bash
-cp .env.example .env
-# Fill in your DB, Redis, Email, and Twilio credentials
-```
-
-### 3. Run with Docker (recommended)
-
-```bash
-docker-compose up --build
-```
-
-### 4. Run locally
+### Install dependencies
 
 ```bash
 npm install
+```
+
+### Configure environment variables
+
+Copy `.env.example` to `.env` and configure your local environment.
+
+```bash
+cp .env.example .env
+```
+
+Never commit the `.env` file to Git.
+
+### Run locally
+
+```bash
 npm run dev
+```
+
+### Run using Docker Compose
+
+```bash
+docker-compose up --build
 ```
 
 ---
 
 ## API Reference
 
-### Auth
+### Authentication
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/auth/register` | Register a new user |
-| POST | `/api/auth/login` | Login and get JWT token |
-| GET | `/api/auth/me` | Get current user |
+| POST | `/api/auth/register` | Register a user |
+| POST | `/api/auth/login` | Login and receive JWT |
+| GET | `/api/auth/me` | Get authenticated user |
 
 ### Notifications
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/notifications/send` | Send a notification |
-| GET | `/api/notifications/me` | Get my notifications |
+| POST | `/api/notifications/send` | Queue a notification |
+| GET | `/api/notifications/me` | Get user notifications |
 | GET | `/api/notifications/status/:id` | Get notification status |
+| GET | `/api/notifications/online-users` | Get online users |
 | GET | `/api/notifications/rate-limit/:userId/:channel` | Check rate limit |
 
 ### Templates
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/templates` | Create a template |
-| GET | `/api/templates` | List all templates |
-| GET | `/api/templates/:id` | Get template by ID |
+| POST | `/api/templates` | Create template |
+| GET | `/api/templates` | Get templates |
+| GET | `/api/templates/:id` | Get template |
 | PUT | `/api/templates/:id` | Update template |
 | DELETE | `/api/templates/:id` | Delete template |
 
@@ -121,105 +271,130 @@ npm run dev
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/preferences` | Get my preferences |
-| PUT | `/api/preferences` | Update my preferences |
+| GET | `/api/preferences` | Get notification preferences |
+| PUT | `/api/preferences` | Update notification preferences |
 
 ---
 
-## Example Requests
+## Example: Register User
 
-### Register
 ```json
-POST /api/auth/register
 {
-  "name": "Manohar",
-  "email": "manohar@example.com",
-  "password": "securepassword",
-  "phone": "+919353599181"
+  "name": "Test User",
+  "email": "test@example.com",
+  "password": "your_secure_password"
 }
 ```
 
-### Send Email Notification via Template
-```json
-POST /api/notifications/send
-Authorization: Bearer <token>
+---
 
+## Example: Send Email Notification
+
+Endpoint:
+
+```text
+POST /api/notifications/send
+```
+
+Header:
+
+```text
+Authorization: Bearer <JWT_TOKEN>
+```
+
+Request:
+
+```json
 {
-  "userId": "uuid-of-user",
+  "userId": "USER_UUID",
   "channel": "email",
-  "templateId": "uuid-of-template",
-  "variables": { "orderNumber": "ORD123", "amount": "499" }
+  "subject": "Notification Service Test",
+  "content": "<h1>Hello!</h1><p>Your notification was processed successfully.</p>"
 }
 ```
 
-### Send Direct In-App Notification
-```json
-POST /api/notifications/send
-Authorization: Bearer <token>
-
-{
-  "userId": "uuid-of-user",
-  "channel": "inapp",
-  "subject": "New Message",
-  "content": "You have a new message from Manohar."
-}
-```
-
-### Update Preferences
-```json
-PUT /api/preferences
-Authorization: Bearer <token>
-
-{
-  "emailEnabled": true,
-  "smsEnabled": false,
-  "inappEnabled": true
-}
-```
+The API returns HTTP `202 Accepted` when the notification is successfully queued for asynchronous processing.
 
 ---
 
 ## Notification Lifecycle
 
-```
-queued  ──▶  sent  ──▶  delivered
-                 └──▶  failed  ──▶  (retry x3)
+```text
+Queued
+   |
+   v
+Processing
+   |
+   +------> Delivered
+   |
+   +------> Failed
+              |
+              v
+             Retry
 ```
 
-Every state change is timestamped in PostgreSQL and queryable via `/status/:id`.
+Notification status and delivery information are persisted in PostgreSQL.
 
 ---
 
-## WebSocket (In-App)
+## Security
 
-Connect with a valid JWT token:
+The production deployment uses GCP Secret Manager for sensitive configuration.
 
-```js
-const socket = io('http://localhost:3000', {
-  auth: { token: 'your_jwt_token' }
-});
+Examples include:
 
-socket.on('notification', (data) => {
-  console.log('New notification:', data);
-});
+- Database password
+- JWT signing secret
+- Gmail App Password
+
+Secrets are injected securely into Cloud Run and are never committed to the repository.
+
+The `.env` file is excluded using `.gitignore`.
+
+---
+
+## Cloud Deployment
+
+The application Docker image is built locally and pushed to Google Artifact Registry.
+
+```text
+Source Code
+    |
+    v
+Docker Image
+    |
+    v
+Artifact Registry
+    |
+    v
+Cloud Run
+    |
+    +----> Cloud SQL
+    |
+    +----> Memorystore Redis
+    |
+    +----> Secret Manager
 ```
 
 ---
 
-## Rate Limits
+## Future Improvements
 
-| Channel | Limit |
-|---|---|
-| Email | 5 per hour per user |
-| SMS | 3 per hour per user |
-| In-App | 50 per hour per user |
-
-Configurable via `.env` variables `MAX_EMAILS_PER_HOUR` and `MAX_SMS_PER_HOUR`.
+- OpenAPI / Swagger documentation
+- CI/CD using GitHub Actions
+- Dedicated Cloud Run worker service
+- Pub/Sub integration
+- Dead Letter Queue support
+- Monitoring and alerting
+- Automated integration tests
+- SMS production testing
+- Frontend dashboard for notification management
 
 ---
 
 ## Author
 
 **Manohar Mahadev Athani**
-- GitHub: [@manoharathani27](https://github.com/manoharathani27)
-- LinkedIn: [manoharathani](https://linkedin.com/in/manoharathani)
+
+- GitHub: @manoharathani27
+- LinkedIn: manoharathani
