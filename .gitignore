@@ -4,3 +4,4 @@ logs/*.log
 dist/
 .DS_Store
 logs/
+notification_backup.sql
